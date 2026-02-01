@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>London Foosball League Lineup Generator</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; color: black; }
+            .shadow-lg, .shadow-sm { box-shadow: none !important; }
+            .border-slate-200 { border-color: #000 !important; }
+            .bg-slate-50, .bg-slate-100 { background-color: transparent !important; }
+            .text-slate-500, .text-slate-600 { color: #000 !important; }
+            input, select, textarea { border: none !important; background: transparent !important; appearance: none; }
+            .no-break { break-inside: avoid; }
+        }
+        
+        .print-only { display: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-12">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white p-4 shadow-lg sticky top-0 z-50 no-print">
+        <div class="max-w-4xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <i data-lucide="trophy" class="text-yellow-400 w-6 h-6"></i>
+                <h1 class="text-xl font-bold tracking-tight">London Foosball League Lineup Generator</h1>
+            </div>
+            <button onclick="window.print()" id="printBtn" class="hidden text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-full flex items-center gap-1 transition-colors">
+                <i data-lucide="save" class="w-3.5 h-3.5"></i> Print / PDF
+            </button>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto p-4 space-y-6">
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+            
+            <!-- Left Column: Settings -->
+            <div class="md:col-span-5 space-y-6 no-print">
+                
+                <!-- Roster Section -->
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-lg font-semibold flex items-center gap-2">
+                            <i data-lucide="users" class="w-5 h-5"></i> Squad (<span id="squadCount">0</span>)
+                        </h2>
+                        <button onclick="addPlayer()" id="addPlayerBtn" class="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-full flex items-center gap-1 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Player
+                        </button>
+                    </div>
+
+                    <div id="playerList" class="space-y-3">
+                        <!-- Players injected here by JS -->
+                    </div>
+
+                    <!-- Validation Card -->
+                    <div class="bg-slate-100 rounded-xl p-4 border border-slate-200">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-sm font-medium text-slate-600">Selected for Match</span>
+                            <span class="font-bold text-slate-900"><span id="starterCount">0</span> / 8</span>
+                        </div>
+                        <div id="validationMsg" class="text-sm p-3 rounded-lg flex items-start gap-2 bg-slate-200 text-slate-700 transition-colors"></div>
+                        <button id="generateBtn" onclick="handleGenerateClick()" class="mt-4 w-full bg-slate-900 text-white py-2.5 rounded-lg font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-md active:scale-95">
+                            <i data-lucide="refresh-cw" class="w-4 h-4"></i> Generate Match Sheet
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Results -->
+            <div class="md:col-span-7">
+                
+                <div id="errorBox" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-4 rounded shadow-sm">
+                    <p id="errorText"></p>
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-200 rounded-xl min-h-[400px]">
+                    <i data-lucide="users" class="w-12 h-12 mb-4 opacity-20"></i>
+                    <p>Configure squad and click Generate</p>
+                </div>
+
+                <!-- Results Container -->
+                <div id="resultsContainer" class="hidden space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    
+                    <div class="flex items-center justify-between no-print">
+                        <h2 class="text-lg font-semibold text-slate-900">Match Sheet</h2>
+                        <span class="text-xs text-slate-500">Generated: <span id="generatedTime"></span></span>
+                    </div>
+
+                    <!-- Print Header -->
+                    <div class="print-only mb-6 text-center border-b-2 border-black pb-4">
+                        <h1 class="text-3xl font-bold uppercase tracking-wider mb-2">London Foosball League</h1>
+                        <div class="flex justify-between text-sm mt-4">
+                            <div><strong>Home Team:</strong> _________________</div>
+                            <div><strong>Away Team:</strong> _________________</div>
+                            <div><strong>Date:</strong> _________________</div>
+                        </div>
+                    </div>
+
+                    <!-- Substitutions Block -->
+                    <div id="subsBlock" class="hidden bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4 print:border-black print:bg-transparent print:border-2">
+                        <h3 class="text-sm font-bold text-amber-900 uppercase tracking-wide mb-2 print:text-black">Substitutions</h3>
+                        <div id="subsList" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Match Sheet Table -->
+                    <div class="bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden print:shadow-none print:border-2 print:border-black print:rounded-none">
+                        <div id="matchSheetContent">
+                            <!-- Sections injected here -->
+                        </div>
+                    </div>
+
+                    <!-- Print Footer -->
+                    <div class="print-only mt-8 pt-8 border-t-2 border-black">
+                        <div class="grid grid-cols-2 gap-12">
+                            <div class="border-t border-black pt-2 text-center">Home Captain Signature</div>
+                            <div class="border-t border-black pt-2 text-center">Away Captain Signature</div>
+                        </div>
+                        <div class="mt-8 text-center text-xs text-gray-500">
+                            Generated by LFL Lineup Tool
+                        </div>
+                    </div>
+
+                    <!-- Stats for Screen -->
+                    <div id="statsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-4 no-print">
+                        <!-- Stats injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- Constants ---
+        const SECTIONS = [
+            { id: 1, name: 'Section 1', games: [{ type: 'D', name: 'D1' }, { type: 'D', name: 'D2' }] },
+            { id: 2, name: 'Section 2', games: [{ type: 'S', name: 'S1' }, { type: 'S', name: 'S2' }, { type: 'D', name: 'D3' }] },
+            { id: 3, name: 'Section 3', games: [{ type: 'D', name: 'D4' }, { type: 'D', name: 'D5' }] },
+            { id: 4, name: 'Section 4', games: [{ type: 'D', name: 'D6' }, { type: 'D', name: 'D7' }] },
+            { id: 5, name: 'Section 5', games: [{ type: 'S', name: 'S3' }, { type: 'S', name: 'S4' }, { type: 'D', name: 'D8' }] },
+            { id: 6, name: 'Section 6', games: [{ type: 'D', name: 'D9' }, { type: 'D', name: 'D10' }] },
+        ];
+
+        // --- State ---
+        let state = {
+            players: [
+                { id: 1, name: 'Player 1', starter: true, pos: 'B', canPlaySingles: true },
+                { id: 2, name: 'Player 2', starter: true, pos: 'B', canPlaySingles: true },
+                { id: 3, name: 'Player 3', starter: true, pos: 'B', canPlaySingles: true },
+                { id: 4, name: 'Player 4', starter: true, pos: 'B', canPlaySingles: true },
+            ],
+            lineup: null,
+            subsPlan: [],
+            generatedDate: null
+        };
+
+        // --- Core Functions ---
+
+        function init() {
+            renderRoster();
+            validate();
+            lucide.createIcons();
+        }
+
+        function addPlayer() {
+            if (state.players.length >= 8) return;
+            const newId = (Math.max(...state.players.map(p => p.id), 0) || 0) + 1;
+            state.players.push({ id: newId, name: `Player ${newId}`, starter: true, pos: 'B', canPlaySingles: true });
+            renderRoster();
+            validate();
+        }
+
+        function removePlayer(id) {
+            state.players = state.players.filter(p => p.id !== id);
+            renderRoster();
+            validate();
+        }
+
+        function updatePlayer(id, field, value) {
+            const p = state.players.find(p => p.id === id);
+            if (p) p[field] = value;
+            if (field !== 'name') { // Don't re-render on typing
+                renderRoster();
+                validate();
+            }
+        }
+
+        function toggleStarter(id) {
+            const p = state.players.find(p => p.id === id);
+            if (!p) return;
+
+            if (!p.starter) {
+                const currentStarters = state.players.filter(x => x.starter).length;
+                if (currentStarters >= 8) return;
+            }
+            p.starter = !p.starter;
+            renderRoster();
+            validate();
+        }
+
+        // --- Generator Logic ---
+
+        function evaluatePermutation(players, gameTypes, singlesCounts) {
+            let pIdx = 0;
+            let totalScore = 0;
+            let isValid = true;
+            let assignments = [];
+
+            for (let gType of gameTypes) {
+                if (gType === 'S') {
+                    // Single
+                    const p = players[pIdx++];
+                    // Constraint: Check if player allows singles
+                    if (!p.canPlaySingles) {
+                        isValid = false;
+                    }
+                    
+                    // Soft Constraint: Diversify Singles
+                    if (singlesCounts && singlesCounts[p.id] > 0) {
+                        totalScore -= 500; // Heavily penalize repeating singles to enforce diversity
+                    } else {
+                        totalScore += 50; // Bonus for fresh singles player
+                    }
+
+                    assignments.push({ players: [p] });
+                } else {
+                    // Double
+                    const p1 = players[pIdx++];
+                    const p2 = players[pIdx++];
+                    
+                    if ((p1.pos === 'G' && p2.pos === 'G') || (p1.pos === 'F' && p2.pos === 'F')) {
+                        isValid = false;
+                    }
+                    
+                    assignments.push({ players: [p1, p2] });
+                }
+            }
+            
+            return { isValid, totalScore, assignments };
+        }
+
+        function* permute(permutation) {
+            var length = permutation.length,
+                c = Array(length).fill(0),
+                i = 1, k, p;
+            yield permutation.slice();
+            while (i < length) {
+                if (c[i] < i) {
+                    k = i % 2 && c[i];
+                    p = permutation[i];
+                    permutation[i] = permutation[k];
+                    permutation[k] = p;
+                    ++c[i];
+                    i = 1;
+                    yield permutation.slice();
+                } else {
+                    c[i] = 0;
+                    ++i;
+                }
+            }
+        }
+
+        // Wrapper to handle async UI updates
+        function handleGenerateClick() {
+            const btn = document.getElementById('generateBtn');
+            const originalText = btn.innerHTML;
+            
+            // UI Feedback: Start
+            btn.disabled = true;
+            btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Generating...`;
+            document.getElementById('errorBox').classList.add('hidden');
+            
+            // Use setTimeout to allow the browser to render the loading state
+            setTimeout(() => {
+                try {
+                    generateLineup();
+                } catch(e) {
+                    console.error(e);
+                    showError("Unexpected error occurred.");
+                } finally {
+                    // UI Feedback: End
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                    lucide.createIcons();
+                }
+            }, 50);
+        }
+
+        function generateLineup() {
+            if (!validate()) return;
+
+            const starters = state.players.filter(p => p.starter);
+            const starterCount = starters.length;
+
+            const shuffle = (array) => {
+                let currentIndex = array.length, randomIndex;
+                while (currentIndex !== 0) {
+                    randomIndex = Math.floor(Math.random() * currentIndex);
+                    currentIndex--;
+                    [array[currentIndex], array[randomIndex]] = [array[randomIndex], array[currentIndex]];
+                }
+                return array;
+            };
+
+            let seats = [];
+            let plannedSubs = [];
+            let shuffledStarters = [];
+            let distributionFound = false;
+
+            // Attempt to find a valid role distribution. Increased to 2000 attempts for robustness.
+            for (let i = 0; i < 2000; i++) {
+                shuffledStarters = shuffle([...starters]);
+                seats = [];
+                plannedSubs = [];
+
+                if (starterCount <= 6) {
+                    seats = shuffledStarters.map(p => ({ type: 'FULL', player: p, id: p.id }));
+                } else if (starterCount === 7) {
+                    const full = shuffledStarters.slice(0, 5);
+                    const splitA = shuffledStarters[5];
+                    const splitB = shuffledStarters[6];
+                    full.forEach(p => seats.push({ type: 'FULL', player: p, id: p.id }));
+                    seats.push({ type: 'SPLIT', id: `split-1`, playerIn: splitA, playerOut: splitB, switchAfterSection: 3 });
+                    plannedSubs.push({ out: splitA, in: splitB, section: 3 });
+                } else if (starterCount === 8) {
+                    const full = shuffledStarters.slice(0, 4);
+                    const s1A = shuffledStarters[4], s1B = shuffledStarters[5];
+                    const s2A = shuffledStarters[6], s2B = shuffledStarters[7];
+                    full.forEach(p => seats.push({ type: 'FULL', player: p, id: p.id }));
+                    seats.push({ type: 'SPLIT', id: `split-1`, playerIn: s1A, playerOut: s1B, switchAfterSection: 3 });
+                    plannedSubs.push({ out: s1A, in: s1B, section: 3 });
+                    seats.push({ type: 'SPLIT', id: `split-2`, playerIn: s2A, playerOut: s2B, switchAfterSection: 3 });
+                    plannedSubs.push({ out: s2A, in: s2B, section: 3 });
+                }
+
+                // Validation: Ensure enough singles players exist for Sec 2 and Sec 5
+                const firstHalfPlayers = seats.map(s => (s.type === 'FULL' ? s.player : s.playerIn));
+                const secondHalfPlayers = seats.map(s => (s.type === 'FULL' ? s.player : s.playerOut));
+                const countSingles = (list) => list.filter(p => p.canPlaySingles).length;
+
+                // Section 2 (First Half) needs 2 singles. Section 5 (Second Half) needs 2 singles.
+                if (countSingles(firstHalfPlayers) >= 2 && countSingles(secondHalfPlayers) >= 2) {
+                    distributionFound = true;
+                    break;
+                }
+            }
+
+            // Fallback: If random shuffle fails (tight constraints), force singles players into FULL seats
+            if (!distributionFound) {
+                const capable = starters.filter(p => p.canPlaySingles);
+                const others = starters.filter(p => !p.canPlaySingles);
+                shuffledStarters = [...capable, ...others];
+                
+                seats = [];
+                plannedSubs = [];
+                // Re-apply seat logic with sorted list
+                if (starterCount <= 6) {
+                     seats = shuffledStarters.map(p => ({ type: 'FULL', player: p, id: p.id }));
+                } else if (starterCount === 7) {
+                    const full = shuffledStarters.slice(0, 5);
+                    const splitA = shuffledStarters[5];
+                    const splitB = shuffledStarters[6];
+                    full.forEach(p => seats.push({ type: 'FULL', player: p, id: p.id }));
+                    seats.push({ type: 'SPLIT', id: `split-1`, playerIn: splitA, playerOut: splitB, switchAfterSection: 3 });
+                    plannedSubs.push({ out: splitA, in: splitB, section: 3 });
+                } else if (starterCount === 8) {
+                    const full = shuffledStarters.slice(0, 4);
+                    const s1A = shuffledStarters[4], s1B = shuffledStarters[5];
+                    const s2A = shuffledStarters[6], s2B = shuffledStarters[7];
+                    full.forEach(p => seats.push({ type: 'FULL', player: p, id: p.id }));
+                    seats.push({ type: 'SPLIT', id: `split-1`, playerIn: s1A, playerOut: s1B, switchAfterSection: 3 });
+                    plannedSubs.push({ out: s1A, in: s1B, section: 3 });
+                    seats.push({ type: 'SPLIT', id: `split-2`, playerIn: s2A, playerOut: s2B, switchAfterSection: 3 });
+                    plannedSubs.push({ out: s2A, in: s2B, section: 3 });
+                }
+            }
+
+            const schedule = [];
+            const playCounts = {};
+            const singlesCounts = {};
+            seats.forEach(s => {
+                playCounts[s.id] = 0;
+                if (s.type === 'FULL') singlesCounts[s.player.id] = 0;
+                else {
+                    singlesCounts[s.playerIn.id] = 0;
+                    singlesCounts[s.playerOut.id] = 0;
+                }
+            });
+
+            for (const section of SECTIONS) {
+                let attempts = 0;
+                let bestResult = null;
+                
+                // Increased retry limit for tight constraints
+                while (attempts < 500) {
+                    attempts++;
+                    
+                    const sortedSeats = shuffle([...seats]).sort((a, b) => {
+                        const countA = a.type === 'SPLIT' ? playCounts[a.id] / 2 : playCounts[a.id];
+                        const countB = b.type === 'SPLIT' ? playCounts[b.id] / 2 : playCounts[b.id];
+                        // Add jitter to avoid getting stuck if constraints are tight
+                        return (countA + Math.random()*0.5) - (countB + Math.random()*0.5);
+                    });
+                    
+                    const selectedSeats = sortedSeats.slice(0, 4);
+
+                    const sectionPlayers = selectedSeats.map(s => {
+                        if (s.type === 'FULL') return s.player;
+                        return section.id <= s.switchAfterSection ? s.playerIn : s.playerOut;
+                    });
+
+                    const gameTypes = section.games.map(g => g.type);
+                    
+                    let bestPerm = null;
+                    let maxScore = -Infinity;
+
+                    for (let p of permute(sectionPlayers)) {
+                        const res = evaluatePermutation(p, gameTypes, singlesCounts);
+                        if (res.isValid) {
+                            if (res.totalScore > maxScore) {
+                                maxScore = res.totalScore;
+                                bestPerm = res;
+                            }
+                        }
+                    }
+
+                    if (bestPerm) {
+                        selectedSeats.forEach(s => playCounts[s.id]++);
+                        
+                        const finalGames = [];
+                        section.games.forEach((g, idx) => {
+                            const assignedPlayers = bestPerm.assignments[idx].players;
+                            
+                            // Track singles usage
+                            if (g.type === 'S') {
+                                assignedPlayers.forEach(p => {
+                                    if (singlesCounts[p.id] !== undefined) singlesCounts[p.id]++;
+                                });
+                            }
+
+                            finalGames.push({
+                                ...g,
+                                players: assignedPlayers
+                            });
+                        });
+                        
+                        schedule.push({ section: section, games: finalGames });
+                        break; 
+                    }
+                }
+                
+                if (attempts >= 500) {
+                    showError(`Could not satisfy constraints for ${section.name}. This is likely due to Position conflicts (e.g. too many Goalies/Forwards) or insufficient Singles players.`);
+                    return;
+                }
+            }
+
+            state.lineup = schedule;
+            state.subsPlan = plannedSubs;
+            state.generatedDate = new Date();
+            renderResults();
+        }
+
+        // --- Validation & Rendering ---
+
+        function validate() {
+            const starters = state.players.filter(p => p.starter);
+            const count = starters.length;
+            const msgEl = document.getElementById('validationMsg');
+            const btn = document.getElementById('generateBtn');
+            document.getElementById('starterCount').innerText = count;
+            document.getElementById('squadCount').innerText = state.players.length;
+            document.getElementById('addPlayerBtn').disabled = state.players.length >= 8;
+
+            let isValid = false, msgHTML = '', msgClass = '';
+
+            const singlesOkCount = starters.filter(p => p.canPlaySingles).length;
+            
+            if (count < 4) {
+                msgHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mt-0.5"></i> Min 4 players.`;
+                msgClass = 'text-red-700 bg-red-50';
+            } else if (count > 8) {
+                msgHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mt-0.5"></i> Max 8 players.`;
+                msgClass = 'text-red-700 bg-red-50';
+            } else if (singlesOkCount < 2) {
+                msgHTML = `<i data-lucide="alert-circle" class="w-4 h-4 mt-0.5"></i> Need at least 2 players for Singles.`;
+                msgClass = 'text-red-700 bg-red-50';
+            } else {
+                isValid = true;
+                msgHTML = `<i data-lucide="check-circle-2" class="w-4 h-4 mt-0.5"></i> Valid (${count} players)`;
+                msgClass = 'text-green-700 bg-green-50';
+            }
+
+            msgEl.className = `text-sm p-3 rounded-lg flex items-start gap-2 ${msgClass}`;
+            msgEl.innerHTML = msgHTML;
+            btn.disabled = !isValid;
+            lucide.createIcons();
+            return isValid;
+        }
+
+        function renderRoster() {
+            const list = document.getElementById('playerList');
+            list.innerHTML = '';
+            state.players.forEach(p => {
+                const div = document.createElement('div');
+                div.className = `bg-white rounded-xl shadow-sm border border-slate-200 p-3 transition-all ${p.starter ? 'ring-2 ring-blue-500 bg-blue-50/50' : 'opacity-80'}`;
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" ${p.starter ? 'checked' : ''} onchange="toggleStarter(${p.id})" class="w-5 h-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300 cursor-pointer" />
+                        <div class="flex-1 space-y-1">
+                            <input type="text" value="${p.name}" oninput="updatePlayer(${p.id}, 'name', this.value)" class="w-full font-semibold bg-transparent border-b border-transparent hover:border-slate-300 focus:border-blue-500 focus:outline-none" placeholder="Name" />
+                            <div class="flex gap-2 text-xs pt-1">
+                                <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="pos_${p.id}" ${p.pos==='B'?'checked':''} onchange="updatePlayer(${p.id}, 'pos', 'B')"> Both</label>
+                                <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="pos_${p.id}" ${p.pos==='F'?'checked':''} onchange="updatePlayer(${p.id}, 'pos', 'F')"> Forward</label>
+                                <label class="flex items-center gap-1 cursor-pointer"><input type="radio" name="pos_${p.id}" ${p.pos==='G'?'checked':''} onchange="updatePlayer(${p.id}, 'pos', 'G')"> Goalie</label>
+                            </div>
+                            <div class="pt-1">
+                                <label class="inline-flex items-center gap-1.5 cursor-pointer bg-slate-100/50 px-2 py-0.5 rounded border border-slate-200/50 hover:bg-slate-100 transition-colors">
+                                    <input type="checkbox" ${p.canPlaySingles?'checked':''} onchange="updatePlayer(${p.id}, 'canPlaySingles', this.checked)" class="w-3.5 h-3.5 text-blue-600 rounded focus:ring-blue-500 border-gray-300"> 
+                                    <span class="text-xs text-slate-600">OK playing Singles</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button onclick="removePlayer(${p.id})" class="text-slate-400 hover:text-red-500 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </div>
+                `;
+                list.appendChild(div);
+            });
+            lucide.createIcons();
+        }
+
+        function renderResults() {
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('resultsContainer').classList.remove('hidden');
+            document.getElementById('printBtn').classList.remove('hidden');
+            document.getElementById('printBtn').classList.add('flex');
+            document.getElementById('generatedTime').innerText = state.generatedDate.toLocaleTimeString();
+
+            // Subs
+            const subsBlock = document.getElementById('subsBlock');
+            if (state.subsPlan.length) {
+                subsBlock.classList.remove('hidden');
+                document.getElementById('subsList').innerHTML = state.subsPlan.map(s => `
+                    <div class="flex items-center gap-3 text-sm">
+                        <span class="font-semibold">${s.out.name}</span>
+                        <i data-lucide="arrow-right-left" class="w-4 h-4 text-amber-500"></i>
+                        <span class="font-semibold">${s.in.name}</span>
+                        <span class="text-amber-700 text-xs bg-amber-100 px-2 py-0.5 rounded-full">After Section ${s.section}</span>
+                    </div>
+                `).join('');
+            } else {
+                subsBlock.classList.add('hidden');
+            }
+
+            // Match Sheet
+            const content = document.getElementById('matchSheetContent');
+            content.innerHTML = state.lineup.map((sec, idx) => `
+                <div class="flex flex-col md:flex-row print:flex-row border-b last:border-0 border-slate-200 print:border-black ${idx % 2 ? 'bg-white' : 'bg-slate-50/50 print:bg-transparent'} no-break">
+                    <div class="w-full md:w-32 print:w-24 p-4 flex items-center justify-center md:justify-start font-bold text-slate-500 bg-slate-100/50 md:bg-transparent border-b md:border-b-0 md:border-r border-slate-200 print:border-r print:border-black">
+                        ${sec.section.name}
+                    </div>
+                    <div class="flex-1 grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 lg:grid-cols-3 gap-0 divide-y md:divide-y-0 md:divide-x divide-slate-200 print:divide-black">
+                        ${sec.games.map(g => `
+                            <div class="p-3 flex flex-col justify-center min-h-[80px]">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-mono text-xs font-bold px-1.5 py-0.5 rounded border ${g.type === 'D' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'} print:border-black print:text-black print:bg-transparent">
+                                        ${g.name}
+                                    </span>
+                                </div>
+                                <div class="font-medium text-slate-800 text-sm">
+                                    ${g.players.map(p => p.name).join(' & ')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            // Stats
+            const statsGrid = document.getElementById('statsGrid');
+            statsGrid.innerHTML = state.players.filter(p=>p.starter).map(p => {
+                const count = state.lineup.reduce((acc, sec) => acc + sec.games.reduce((gAcc, g) => gAcc + (g.players.some(x => x.id === p.id) ? 1 : 0), 0), 0);
+                return `<div class="bg-white p-2 rounded border border-slate-200 text-xs flex justify-between"><span class="font-medium truncate">${p.name}</span><span class="bg-slate-100 px-1.5 rounded">${count} games</span></div>`;
+            }).join('');
+            
+            lucide.createIcons();
+        }
+
+        function showError(msg) {
+            document.getElementById('errorBox').classList.remove('hidden');
+            document.getElementById('errorText').innerText = msg;
+        }
+
+        window.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
